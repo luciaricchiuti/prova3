@@ -18,12 +18,12 @@ class Codegen {
 	static CodegenAccess.StaticCodegenTarget isDoingStaticCodegen = new CodegenAccess.StaticCodegenTarget("");
 	// only read/write when generating code with synchronized protection
 	private static final  Map<String, CodegenResult> generatedSources = new HashMap<String, CodegenResult>();
-	private static final Map<String, Encoder.ReflectionEncoder> reflectionEncoders = new HashMap<String, Encoder.ReflectionEncoder>();
+	private static  Map<String, Encoder.ReflectionEncoder> reflectionEncoders = new HashMap<String, Encoder.ReflectionEncoder>();
 	static {
 		
 	}
 
-	    Encoder.ReflectionEncoder getReflectionEncoder(String cacheKey, Type type) {
+	   static Encoder.ReflectionEncoder getReflectionEncoder(String cacheKey, Type type) {
 		Encoder.ReflectionEncoder encoder = CodegenImplNative.NATIVE_ENCODERS.get(type);
 		if (encoder != null) {
 			return encoder;
