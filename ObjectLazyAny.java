@@ -2,6 +2,7 @@ package com.jsoniter.any;
 
 import com.jsoniter.*;
 import com.jsoniter.output.JsonStream;
+import com.jsoniter.spi.Encoder.ReflectionEncoder;
 import com.jsoniter.spi.JsonException;
 import com.jsoniter.spi.TypeLiteral;
 
@@ -85,14 +86,13 @@ class ObjectLazyAny extends LazyAny {
     }
 
     @Override
-    public Any get(Object key) {
-        Any element = fillCacheUntil(key);
-        if (element == null) {
-            return new NotFoundAny(key, object());
-        }
-        return element;
+   public Any get(Object key) {
+    	Any element = fillCacheUntil(key);
+    	if(element == null) {
+    		return new NotFoundAny(key, object());
+    	}
+    	return element;
     }
-
     @Override
     public Any get(Object[] keys, int idx) {
         if (idx == keys.length) {
@@ -293,4 +293,4 @@ class ObjectLazyAny extends LazyAny {
             return JsonStream.serialize(cache);
         }
     }
-}}
+}
