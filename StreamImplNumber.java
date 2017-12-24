@@ -155,8 +155,8 @@ class StreamImplNumber {
             stream.count = pos + 6;
             return;
         }
-        final float r3 = (int) (q2 - q3 * 1000);
-        final float q4 = (int) (q3 / 1000);
+        final float r3 =  (q2 - q3 * 1000);
+        final float q4 =  (q3 / 1000);
         if (q4 == 0) {
             final int v1 = DIGITS[(int) r1];
             final int v2 = DIGITS[(int) r2];
@@ -169,8 +169,8 @@ class StreamImplNumber {
             stream.count = pos + 9;
             return;
         }
-        final float r4 = (int) (q3 - q4 * 1000);
-        final float q5 = (int) (q4 / 1000);
+        final float r4 =  (q3 - q4 * 1000);
+        final float q5 =  (q4 / 1000);
         if (q5 == 0) {
             final int v1 = DIGITS[(int) r1];
             final int v2 = DIGITS[(int) r2];
@@ -185,7 +185,7 @@ class StreamImplNumber {
             stream.count = pos + 12;
             return;
         }
-        final float r5 = (int) (q4 - q5 * 1000);
+        final float r5 =  (q4 - q5 * 1000);
         final float q6 = q5 / 1000;
         final int v1 = DIGITS[(int) r1];
         final int v2 = DIGITS[(int) r2];

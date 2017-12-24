@@ -21,6 +21,11 @@ import java.lang.reflect.Type;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Locale;
@@ -38,7 +43,7 @@ public class GsonCompatibilityMode extends Config {
 	static {
 		REPLACEMENT_CHARS = new String[128];
 		for (int i = 0; i <= 0x1f; i++) {
-			REPLACEMENT_CHARS[i] = String.format("\\u%04x", (int) i);
+			REPLACEMENT_CHARS[i] = String.format("\\u%04x",  i);
 		}
 		REPLACEMENT_CHARS['"'] = "\\\"";
 		REPLACEMENT_CHARS['\\'] = "\\\\";
@@ -60,12 +65,13 @@ public class GsonCompatibilityMode extends Config {
 	}
 
 	protected Builder builder() {
-		if(builder() instanceof Builder) {
-
+		Builder b = null;
+		if (super.builder() instanceof Builder) {
+			b = (Builder) super.builder();
 		}
-		return (Builder) super.builder();
+		return b;
 	}
-
+ 
 	public static class Builder extends Config.Builder {
 		private boolean excludeFieldsWithoutExposeAnnotation = false;
 		private boolean disableHtmlEscaping = false;
@@ -110,12 +116,31 @@ public class GsonCompatibilityMode extends Config {
 		}
 
 		public Builder setDateFormat(final String pattern) {
-			dateFormat = new ThreadLocal<DateFormat>() {
-				@Override
-				protected DateFormat initialValue() {
-					return new SimpleDateFormat(pattern, Locale.US);
+			class JdkDatetimeSupport {
+
+				
+				private String pattern = null;
+				// 2014-04-01 10:45
+				LocalDateTime dateTime = LocalDateTime.of(2014, Month.APRIL, 1, 10, 45);
+				// format as ISO week date (2014-W08-4)
+				String asIsoWeekDate = dateTime.format(DateTimeFormatter.ISO_WEEK_DATE);
+				// format ISO date time (2014-02-20T20:04:05.867)
+				String asIsoDateTime = dateTime.format(DateTimeFormatter.ISO_DATE_TIME);
+				// using a custom pattern (01/04/2014)
+				String asCustomPattern = dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+				// french date formatting (1. avril 2014)
+				String frenchDate = dateTime.format(DateTimeFormatter.ofPattern("d. MMMM yyyy", new Locale("fr")));
+				// using short german date/time formatting (01.04.14 10:45)
+				DateTimeFormatter formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)
+				.withLocale(new Locale("de"));
+				String germanDateTime = dateTime.format(formatter);
+				// parsing date strings
+				LocalDate fromIsoDate = LocalDate.parse("2014-01-20");
+				LocalDate fromIsoWeekDate = LocalDate.parse("2014-W14-2", DateTimeFormatter.ISO_WEEK_DATE);
+				LocalDate fromCustomPattern = LocalDate.parse("20.01.2014", DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+			    ;
 				}
-			};
+			
 			return this;
 		}
 
@@ -163,10 +188,11 @@ public class GsonCompatibilityMode extends Config {
 
 		public GsonCompatibilityMode build() {
 			escapeUnicode(false);
-			if(build() == super.build()) {
-
+			GsonCompatibilityMode g = null;
+			if (super.build() instanceof GsonCompatibilityMode) {
+				g = (GsonCompatibilityMode) super.build();
 			}
-			return (GsonCompatibilityMode) super.build();
+			return g;
 		}
 
 		@Override
@@ -182,11 +208,10 @@ public class GsonCompatibilityMode extends Config {
 				return false;
 			if (!super.equals(o))
 				return false;
-			if(o instanceof Builder ) {
-
+			Builder builder = null;
+			if (o instanceof Builder) {
+				builder = (Builder) o;
 			}
-
-			Builder builder = (Builder) o;
 
 			if (excludeFieldsWithoutExposeAnnotation != builder.excludeFieldsWithoutExposeAnnotation)
 				return false;
@@ -201,11 +226,11 @@ public class GsonCompatibilityMode extends Config {
 				return false;
 			if (serializationExclusionStrategies != null
 					? !serializationExclusionStrategies.equals(builder.serializationExclusionStrategies)
-							: builder.serializationExclusionStrategies != null)
+					: builder.serializationExclusionStrategies != null)
 				return false;
 			return deserializationExclusionStrategies != null
 					? deserializationExclusionStrategies.equals(builder.deserializationExclusionStrategies)
-							: builder.deserializationExclusionStrategies == null;
+					: builder.deserializationExclusionStrategies == null;
 		}
 
 		@Override
@@ -225,10 +250,10 @@ public class GsonCompatibilityMode extends Config {
 
 		@Override
 		public Config.Builder copy() {
-			if(copy() == super.copy()) {
-
+			Builder copied = null;
+			if (super.copy() instanceof Builder) {
+				copied = (Builder) super.copy();
 			}
-			Builder copied = (Builder) super.copy();
 			copied.excludeFieldsWithoutExposeAnnotation = excludeFieldsWithoutExposeAnnotation;
 			copied.disableHtmlEscaping = disableHtmlEscaping;
 			copied.dateFormat = dateFormat;
@@ -272,16 +297,16 @@ public class GsonCompatibilityMode extends Config {
 			return new Encoder() {
 				@Override
 				public void encode(Object obj, JsonStream stream) throws IOException {
-					if(obj instanceof String) {
-
+					String value = null;
+					if (obj instanceof String) {
+						value = (String) obj;
 					}
-					String value = (String) obj;
 					stream.write('"');
-					int _surrogate;
-					int i = 0; 
+					int _surrogate = 0;
+					int i = 0;
 					while (i < value.length()) {
 						int c = value.charAt(i);
-						String replacement;
+						String replacement = null;
 						if (c < 128) {
 							replacement = replacements[c];
 							if (replacement == null) {
@@ -304,7 +329,7 @@ public class GsonCompatibilityMode extends Config {
 									Integer n1 = new Integer((0xe0 | (c >> 12)));
 									Integer n2 = new Integer((0x80 | ((c >> 6) & 0x3f)));
 									Integer n3 = new Integer((0x80 | (c & 0x3f)));
-									stream.write(n1.byteValue() , n2.byteValue(), n3.byteValue());
+									stream.write(n1.byteValue(), n2.byteValue(), n3.byteValue());
 									continue;
 								}
 								// Yup, a surrogate:
@@ -319,7 +344,7 @@ public class GsonCompatibilityMode extends Config {
 									// end?
 									break;
 								}
-								i++; 
+								i++;
 								c = value.charAt(i);
 								int firstPart = _surrogate;
 								_surrogate = 0;
@@ -327,18 +352,18 @@ public class GsonCompatibilityMode extends Config {
 								if (c < SURR2_FIRST || c > SURR2_LAST) {
 									throw new JsonException(
 											"Broken surrogate pair: first char 0x" + Integer.toHexString(firstPart)
-											+ ", second 0x" + Integer.toHexString(c) + "; illegal combination");
+													+ ", second 0x" + Integer.toHexString(c) + "; illegal combination");
 								}
 								c = 0x10000 + ((firstPart - SURR1_FIRST) << 10) + (c - SURR2_FIRST);
 								if (c > 0x10FFFF) { // illegal in JSON as well
 									// as in XML
 									throw new JsonException("illegalSurrogate");
 								}
-								
+
 								Integer n1 = new Integer((0xf0 | (c >> 18)));
 								Integer n2 = new Integer((0x80 | ((c >> 12) & 0x3f)));
 								Integer n3 = new Integer((0x80 | ((c >> 6) & 0x3f)));
-								Integer n4 = new Integer((0x80 | (c & 0x3f)));								
+								Integer n4 = new Integer((0x80 | (c & 0x3f)));
 								stream.write(n1.byteValue(), n2.byteValue(), n3.byteValue(), n4.byteValue());
 							}
 						}
