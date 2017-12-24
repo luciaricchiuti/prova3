@@ -17,10 +17,13 @@ class Codegen {
 
 	static CodegenAccess.StaticCodegenTarget isDoingStaticCodegen = new CodegenAccess.StaticCodegenTarget("");
 	// only read/write when generating code with synchronized protection
-	private final static Map<String, CodegenResult> generatedSources = new HashMap<String, CodegenResult>();
-	private volatile static Map<String, Encoder.ReflectionEncoder> reflectionEncoders = new HashMap<String, Encoder.ReflectionEncoder>();
+	private static final  Map<String, CodegenResult> generatedSources = new HashMap<String, CodegenResult>();
+	private static final Map<String, Encoder.ReflectionEncoder> reflectionEncoders = new HashMap<String, Encoder.ReflectionEncoder>();
+	static {
+		
+	}
 
-	public static Encoder.ReflectionEncoder getReflectionEncoder(String cacheKey, Type type) {
+	    Encoder.ReflectionEncoder getReflectionEncoder(String cacheKey, Type type) {
 		Encoder.ReflectionEncoder encoder = CodegenImplNative.NATIVE_ENCODERS.get(type);
 		if (encoder != null) {
 			return encoder;
@@ -52,73 +55,75 @@ class Codegen {
 		return gen(cacheKey, type);
 	}
 
-	private static synchronized Encoder gen(final String cacheKey, Type type) {
-		Encoder encoder = JsoniterSpi.getEncoder(cacheKey);
-		if (encoder != null) {
-			return encoder;
-		}
-		List<Extension> extensions = JsoniterSpi.getExtensions();
-		for (Extension extension : extensions) {
-			encoder = extension.createEncoder(cacheKey, type);
+	private static Encoder gen(final String cacheKey, Type type) {
+		synchronized (gen(cacheKey, type)) {
+			Encoder encoder = JsoniterSpi.getEncoder(cacheKey);
+			if (encoder != null) {
+				return encoder;
+			}
+			List<Extension> extensions = JsoniterSpi.getExtensions();
+			for (Extension extension : extensions) {
+				encoder = extension.createEncoder(cacheKey, type);
+				if (encoder != null) {
+					JsoniterSpi.addNewEncoder(cacheKey, encoder);
+					return encoder;
+				}
+			}
+			encoder = CodegenImplNative.NATIVE_ENCODERS.get(type);
 			if (encoder != null) {
 				JsoniterSpi.addNewEncoder(cacheKey, encoder);
 				return encoder;
 			}
-		}
-		encoder = CodegenImplNative.NATIVE_ENCODERS.get(type);
-		if (encoder != null) {
-			JsoniterSpi.addNewEncoder(cacheKey, encoder);
-			return encoder;
-		}
-		addPlaceholderEncoderToSupportRecursiveStructure(cacheKey);
-		try {
-			EncodingMode mode = JsoniterSpi.getCurrentConfig().encodingMode();
-			if (mode != EncodingMode.REFLECTION_MODE) {
-				Type originalType = type;
-				type = chooseAccessibleSuper(type);
-				if (Object.class == type) {
-					throw new JsonException("dynamic code can not serialize private class: " + originalType);
-				}
-			}
-			ClassInfo classInfo = new ClassInfo(type);
-			if (Map.class.isAssignableFrom(classInfo.clazz) && classInfo.typeArgs.length > 1) {
-				DefaultMapKeyEncoder.registerOrGetExisting(classInfo.typeArgs[0]);
-			}
-			if (mode == EncodingMode.REFLECTION_MODE) {
-				encoder = ReflectionEncoderFactory.create(classInfo);
-				return encoder;
-			}
-			if (isDoingStaticCodegen.outputDir == "") {
-				try {
-					if(Class.forName(cacheKey).newInstance() instanceof Encoder) {
-						encoder = (Encoder) Class.forName(cacheKey).newInstance();
-						return encoder;
-					}
-					
-				} catch (Exception e) {
-					if (mode == EncodingMode.STATIC_MODE) {
-						throw new JsonException(
-								"static gen should provide the encoder we need, but failed to create the encoder", e);
-					}
-				}
-			}
-			CodegenResult source = genSource(cacheKey, classInfo);
+			addPlaceholderEncoderToSupportRecursiveStructure(cacheKey);
 			try {
-				generatedSources.put(cacheKey, source);
-				if (isDoingStaticCodegen.outputDir == "") {
-					encoder = DynamicCodegen.gen(classInfo.clazz, cacheKey, source);
-				} else {
-					staticGen(classInfo.clazz, cacheKey, source);
+				EncodingMode mode = JsoniterSpi.getCurrentConfig().encodingMode();
+				if (mode != EncodingMode.REFLECTION_MODE) {
+					Type originalType = type;
+					type = chooseAccessibleSuper(type);
+					if (Object.class == type) {
+						throw new JsonException("dynamic code can not serialize private class: " + originalType);
+					}
 				}
-				return encoder;
-			} catch (Exception e) {
-				String msg = "failed to generate encoder for: " + type + " with " + Arrays.toString(classInfo.typeArgs)
-						+ ", exception: " + e;
-				msg = msg + "\n" + source;
-				throw new JsonException(msg, e);
+				ClassInfo classInfo = new ClassInfo(type);
+				if (Map.class.isAssignableFrom(classInfo.clazz) && classInfo.typeArgs.length > 1) {
+					DefaultMapKeyEncoder.registerOrGetExisting(classInfo.typeArgs[0]);
+				}
+				if (mode == EncodingMode.REFLECTION_MODE) {
+					encoder = ReflectionEncoderFactory.create(classInfo);
+					return encoder;
+				}
+				if (isDoingStaticCodegen.outputDir == "") {
+					try {
+						if (Class.forName(cacheKey).newInstance() instanceof Encoder) {
+							encoder = (Encoder) Class.forName(cacheKey).newInstance();
+						}
+						return encoder;
+					} catch (Exception e) {
+						if (mode == EncodingMode.STATIC_MODE) {
+							throw new JsonException(
+									"static gen should provide the encoder we need, but failed to create the encoder",
+									e);
+						}
+					}
+				}
+				CodegenResult source = genSource(cacheKey, classInfo);
+				try {
+					generatedSources.put(cacheKey, source);
+					if (isDoingStaticCodegen.outputDir == "") {
+						encoder = DynamicCodegen.gen(classInfo.clazz, cacheKey, source);
+					} else {
+						staticGen(classInfo.clazz, cacheKey, source);
+					}
+					return encoder;
+				} catch (Exception e) {
+					String msg = "failed to generate encoder for: " + type + " with "
+							+ Arrays.toString(classInfo.typeArgs) + ", exception: " + e;
+					msg = msg + "\n" + source;
+					throw new JsonException(msg, e);
+				}
+			} finally {
+				JsoniterSpi.addNewEncoder(cacheKey, encoder);
 			}
-		} finally {
-			JsoniterSpi.addNewEncoder(cacheKey, encoder);
 		}
 	}
 
@@ -127,22 +132,23 @@ class Codegen {
 			@Override
 			public void encode(Object obj, JsonStream stream) throws IOException {
 				Encoder encoder = JsoniterSpi.getEncoder(cacheKey);
-				if (this == encoder) {
-					for (int i = 0; i < 30; i++) {
-						encoder = JsoniterSpi.getEncoder(cacheKey);
-						if (this == encoder) {
-							try {
+				try {
+					if (this == encoder) {
+						for (int i = 0; i < 30; i++) {
+							encoder = JsoniterSpi.getEncoder(cacheKey);
+
+							if (this == encoder) {
 								Thread.sleep(1000);
-							} catch (InterruptedException e) {
-								throw new JsonException(e);
+							} else {
+								break;
 							}
-						} else {
-							break;
+						}
+						if (this == encoder) {
+							throw new JsonException("internal error: placeholder is not replaced with real encoder");
 						}
 					}
-					if (this == encoder) {
-						throw new JsonException("internal error: placeholder is not replaced with real encoder");
-					}
+				} catch (InterruptedException e) {
+					throw new JsonException(e);
 				}
 				encoder.encode(obj, stream);
 			}
@@ -153,18 +159,17 @@ class Codegen {
 		Type[] typeArgs = new Type[0];
 		Class clazz = null;
 		if (type instanceof ParameterizedType) {
-			ParameterizedType pType = (ParameterizedType) type;
-			if(pType.getRawType() instanceof Class) {
-				
-				clazz = (Class) pType.getRawType();
-				typeArgs = pType.getActualTypeArguments();
+			ParameterizedType pType = null;
+			if (type instanceof ParameterizedType) {
+				pType = (ParameterizedType) type;
 			}
-			
+			clazz = (Class) pType.getRawType();
+			typeArgs = pType.getActualTypeArguments();
 		} else {
-			if(type instanceof Class) {
+			if (type instanceof Class) {
 				clazz = (Class) type;
 			}
-			
+
 		}
 		if (Modifier.isPublic(clazz.getModifiers())) {
 			return type;
@@ -184,7 +189,7 @@ class Codegen {
 		return walkSuperUntilPublic(clazz.getSuperclass());
 	}
 
-	public static CodegenResult getGeneratedSource(String cacheKey) {
+	public static  CodegenResult getGeneratedSource(String cacheKey) {
 		return generatedSources.get(cacheKey);
 	}
 
@@ -252,3 +257,4 @@ class Codegen {
 		}
 	}
 }
+
